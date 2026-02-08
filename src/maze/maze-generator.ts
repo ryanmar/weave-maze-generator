@@ -1,9 +1,10 @@
 import { Maze } from './Maze';
 import { Cell } from './Cell';
 import { Node } from './Node';
-import { permutations, shuffleArray } from '../utils/arrays';
+import { permutations }  from '../utils/arrays';
 import { solveMaze } from './maze-solver';
 import { MazeOptions } from './MazeOptions';
+import { Entropy } from '../utils/Entropy';
 
 function assignRegion(region: number, seed: Node, stack: Node[]): Node[] {
 
@@ -456,7 +457,7 @@ function addCross(maze: Maze, cell: Cell, stack: Node[], northSouthHopsEastWest:
     return true;
 }
 
-function addLoopsAndCrosses(maze: Maze, loopFraction: number, crossFraction: number, stack: Node[]) {
+function addLoopsAndCrosses(maze: Maze, loopFraction: number, crossFraction: number, stack: Node[], entropy: Entropy) {
 
     const cells: Cell[] = [];
     for (let i = maze.height - 2; i >= 1; --i) {
@@ -470,10 +471,10 @@ function addLoopsAndCrosses(maze: Maze, loopFraction: number, crossFraction: num
     let loops = 0;
     const maxLoops = Math.round(cells.length * loopFraction);
     while (loops < maxLoops && cells.length > 0) {
-        const index = Math.floor(cells.length * Math.random());
+        const index = entropy.randomIndex(cells);
         const cell = cells[index];
         cells.splice(index, 1);
-        const permutation = permutations[Math.floor(permutations.length * Math.random())];
+        const permutation = entropy.randomElement(permutations);
         for (let i = permutation.length - 1; i >= 0; --i) {
             let addLoop: (maze: Maze, cell: Cell, stack: Node[], northSouthHopsEastWest: boolean) => boolean;
             switch (permutation[i]) {
@@ -490,7 +491,7 @@ function addLoopsAndCrosses(maze: Maze, loopFraction: number, crossFraction: num
                     addLoop = addNorthWestLoop;
                     break;
             }
-            const northSouthHopsEastWest = Math.random() < 0.5;
+            const northSouthHopsEastWest = entropy.flip();
             if (addLoop(maze, cell, stack, northSouthHopsEastWest)) {
                 ++loops;
                 break;
@@ -513,10 +514,10 @@ function addLoopsAndCrosses(maze: Maze, loopFraction: number, crossFraction: num
     let crosses = 0;
     const maxCrosses = Math.round(cells.length * crossFraction);
     while (crosses < maxCrosses && cells.length > 0) {
-        const index = Math.floor(cells.length * Math.random());
+        const index = entropy.randomIndex(cells);
         const cell = cells[index];
         cells.splice(index, 1);
-        const northSouthHopsEastWest = Math.random() < 0.5;
+        const northSouthHopsEastWest = entropy.flip();
         if (addCross(maze, cell, stack, northSouthHopsEastWest)) {
             ++crosses;
         } else if (addCross(maze, cell, stack, !northSouthHopsEastWest)) {
@@ -544,7 +545,7 @@ function moveToEnd(nodes: Node[], node: Node) {
     nodes.push(node);
 }
 
-function createSpanningTree(maze: Maze, nodes: Node[], regions: Node[][], longCorridors: boolean) {
+function createSpanningTree(maze: Maze, nodes: Node[], regions: Node[][], longCorridors: boolean, entropy: Entropy) {
 
     const maxX = maze.width - 1;
     const maxY = maze.height - 1;
@@ -559,18 +560,18 @@ function createSpanningTree(maze: Maze, nodes: Node[], regions: Node[][], longCo
     }
 
     if (longCorridors) {
-        shuffleArray(nodes);
+        entropy.shuffleInPlace(nodes);
     }
 
     outer: while (nodes.length > 0) {
-        const index = longCorridors ? nodes.length - 1 : Math.floor(nodes.length * Math.random());
+        const index = longCorridors ? nodes.length - 1 : entropy.randomIndex(nodes);
         const node = nodes[index];
         if (longCorridors) {
             moveToEnd(nodes, node);
         }
 
         const cell = node.cell;
-        const permutation = permutations[Math.floor(permutations.length * Math.random())];
+        const permutation = entropy.randomElement(permutations);
         for (let i = permutation.length - 1; i >= 0; --i) {
             switch (permutation[i]) {
                 case 0: {
@@ -653,11 +654,12 @@ function createSpanningTree(maze: Maze, nodes: Node[], regions: Node[][], longCo
 }
 
 export function generateMaze(options: MazeOptions): Maze {
+    const entropy = new Entropy(options.seed);
     const maze = new Maze(options);
     const stack: Node[] = [];
-    addLoopsAndCrosses(maze, options.loopFrac, options.crossFrac, stack);
+    addLoopsAndCrosses(maze, options.loopFrac, options.crossFrac, stack, entropy);
     const regions = assignRegions(maze, stack);
-    createSpanningTree(maze, stack, regions, options.longPassages);
-    solveMaze(maze);
+    createSpanningTree(maze, stack, regions, options.longPassages, entropy);
+    solveMaze(maze, entropy);
     return maze;
 }

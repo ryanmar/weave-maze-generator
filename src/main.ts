@@ -29,7 +29,8 @@ import {
     MIN_CELL_SIZE,
     MIN_IMAGE_SIZE,
     MIN_LINE_WIDTH_FRAC,
-    MIN_PASSAGE_WIDTH_FRAC, RenderOptions
+    MIN_PASSAGE_WIDTH_FRAC, 
+    RenderOptions
 } from '@/render/RenderOptions';
 import { checkFileExists, ensureDirectoryExists, validateFilename } from '@/utils/files';
 import { loadMask } from '@/mask/mask-loader';
@@ -49,6 +50,7 @@ Usage: weave-maze-generator [options]
 Output:
   -d, --destination "..."     Output directory (required)
   -f, --format                Output file format: png | svg | pdf (default: all three formats)
+  -r, --seed                  Numeric seed for maze generation (default: random)
   -p, --prefix                Output filename prefix (default: ${DEFAULT_FILENAME_PREFIX})
   -x, --solution-suffix       Output filename solution suffix (default: ${DEFAULT_FILENAME_SOLUTION_SUFFIX})
   -n, --no-timestamp          Disables output filename timestamp
@@ -120,6 +122,11 @@ async function main() {
                 key: 'format',
                 flags: [ '-f', '--format' ],
                 type: ParamType.STRING,
+            },
+            {
+                key: 'seed',
+                flags: [ '-r', '--seed' ],
+                type: ParamType.INTEGER,
             },
             {
                 key: 'prefix',
@@ -263,6 +270,14 @@ async function main() {
         console.log((e as Error).message);
         return;
     }
+
+    let seed = args.get('seed') as number | undefined;
+    if (seed === undefined) {
+        seed = Math.random() * 2 ** 32 >>> 0;
+    } else if (!Number.isInteger(seed) || seed < 0 || seed >= 2 ** 32) {
+        console.log('\nSeed must be an integer between 0 and 2^32 - 1.\n');
+        return;
+    }   
 
     let filenamePrefix = args.get('prefix') as string | undefined;
     if (!filenamePrefix) {
@@ -487,7 +502,7 @@ async function main() {
         return;
     }
 
-    void await saveMaze(generateMaze(new MazeOptions(mazeWidth, mazeHeight, loopsFrac, crossFrac, longPassages, mask)),
+    void await saveMaze(generateMaze(new MazeOptions(mazeWidth, mazeHeight, loopsFrac, crossFrac, longPassages, mask, seed)),
             new RenderOptions(outputDirectory, fileFormat, filenamePrefix, filenameSolutionSuffix, timestamp, solution,
                     paperSize, cellSize, imageWidth, imageHeight, roundedCorners, lineWidthFrac, passageWidthFrac,
                     wallColor, solutionColor, backgroundColor));
