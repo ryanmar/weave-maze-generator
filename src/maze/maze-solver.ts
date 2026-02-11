@@ -260,13 +260,13 @@ export function solveMaze(maze: Maze, entropy: Entropy, entryAngle: number | und
     const borderNodes = findBorderNodes(maze, entropy);
     const bestSolution: Node[] = [];
     const stack: Node[] = [];
+    const exitNode = exitAngle || exitAngle === 0 ? findBorderCellByDegrees(maze, exitAngle) : undefined;
     if (entryAngle || entryAngle === 0) {
         // Handle both entry-only and entry and exit specified cases.
-        flood(findBorderCellByDegrees(maze, entryAngle), maze, borderNodes, bestSolution, stack, 
-              exitAngle || exitAngle === 0 ? findBorderCellByDegrees(maze, exitAngle) : undefined);
-    } else if (exitAngle || exitAngle === 0) {
+        flood(findBorderCellByDegrees(maze, entryAngle), maze, borderNodes, bestSolution, stack, exitNode);
+    } else if (exitNode) {
         // Handle exit-only specified case.
-        flood(findBorderCellByDegrees(maze, exitAngle), maze, borderNodes, bestSolution, stack);
+        flood(exitNode, maze, borderNodes, bestSolution, stack);
         bestSolution.reverse();
     } else {
         // Best (longest) solution to select entry and exit nodes.
@@ -274,4 +274,5 @@ export function solveMaze(maze: Maze, entropy: Entropy, entryAngle: number | und
     }
 
     wireSolution(bestSolution, maze, entropy);
+
 }
