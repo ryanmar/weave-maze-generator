@@ -546,8 +546,9 @@ async function main() {
         new RenderOptions(
             outputDirectory, fileFormat, filenamePrefix, filenameSolutionSuffix, timestamp, solution,
             paperSize, cellSize, imageWidth, imageHeight, roundedCorners, lineWidthFrac, passageWidthFrac,
-            wallColor, solutionColor, backgroundColor)
+            wallColor, passageColor, solutionColor, backgroundColor)
         );
 }
+
 
 void await main();
