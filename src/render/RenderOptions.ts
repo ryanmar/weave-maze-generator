@@ -26,6 +26,7 @@ export const DEFAULT_PASSAGE_WIDTH_FRAC = 0.7;
 export const DEFAULT_PNG_BACKGROUND_COLOR = new Color(255, 255, 255, 1);
 export const DEFAULT_SVG_AND_PDF_BACKGROUND_COLOR = new Color(0, 0, 0, 0);
 export const DEFAULT_WALL_COLOR = new Color(0, 0, 0, 1);
+export const DEFAULT_PASSAGE_COLOR = new Color(255, 255, 255, 1);
 export const DEFAULT_SOLUTION_COLOR = new Color(255, 0, 0, 1);
 
 export class RenderOptions {
@@ -44,6 +45,7 @@ export class RenderOptions {
                 public readonly lineWidthFrac = DEFAULT_LINE_WIDTH_FRAC,
                 public readonly passageWidthFrac = DEFAULT_PASSAGE_WIDTH_FRAC,
                 public readonly wallColor = DEFAULT_WALL_COLOR,
+                public readonly passageColor = DEFAULT_PASSAGE_COLOR,
                 public readonly solutionColor = DEFAULT_SOLUTION_COLOR,
 
                 public readonly backgroundColor?: Color,

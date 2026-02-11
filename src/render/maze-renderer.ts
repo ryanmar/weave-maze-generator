@@ -280,9 +280,181 @@ function generateWallPaths(maze: Maze, cellSize: number, cellMarginFrac: number)
     return c.getPaths();
 }
 
+/**
+ * Generates rendering paths for maze passage ways.
+ * 
+ * This is a secondary rendering function that focuses on the paths representing
+ * the different passageways inside the maze. Conceptually its the center of the 
+ * same paths that represent the passage walls. It handles all the same cases as
+ * the wall rendering function.
+ * 
+ * - Dead ends (passages that terminate)
+ * - 90deg turns (L-shaped corners)
+ * - Straight passages (corridors)
+ * - T-junctions (three-way intersections)
+ * - Crossroads (four-way intersections)
+ * - Weave crossings (over/under passages)
+ * 
+ * **Passage Direction Encoding:**
+ * Each cell's passage directions are encoded as 4-bit values:
+ * - Bit 3 (0b1000): North passage
+ * - Bit 2 (0b0100): East passage
+ * - Bit 1 (0b0010): South passage
+ * - Bit 0 (0b0001): West passage
+ * 
+ * The 16 possible combinations (0-15) cover all passage configurations.
+ * 
+ * **Coordinate Variables:**
+ * - `ox`, `oy`: Cell origin (top-left corner)
+ * - `d1`: Outer margin distance (cell size - d0)
+ * - `dm`: Cell midpoint
+ * - `r0`: Corner radius for 90� passage turns
+ * 
+ * @param {Maze} maze - The maze to render passage ways for.
+ * @param {number} cellSize - Size of each cell in pixels.
+ * @param {number} cellMarginFrac - Margin fraction for passage positioning.
+ * 
+ * @returns {Segment[][]} Array of optimized paths representing passageways.
+ */
+function generatePassagePaths(maze: Maze, cellSize: number, cellMarginFrac: number): Segment[][] {
+
+    const c = new PathOptimizer();
+
+    // Calculate key distances (same as solution paths)
+    const d0 = cellMarginFrac * cellSize;       // Inner edge of passage
+    const d1 = (1 - cellMarginFrac) * cellSize; // Outer edge of passage
+    const dm = cellSize / 2;                    // Cell center
+
+    for (let i = maze.height - 1; i >= 0; --i) {
+        const oy = i * cellSize;
+        
+        for (let j = maze.width - 1; j >= 0; --j) {
+            const ox = j * cellSize;
+            const cell = maze.cells[i][j];
+
+            // ---------------------------------------------------------------
+            // WEAVE CROSSING WALLS
+            // ---------------------------------------------------------------
+            if (cell.upper.north) { // North-south passage on upper layer
+                c.moveTo(ox + dm, oy);
+                c.lineTo(ox + dm, oy + cellSize); // north south
+                c.moveTo(ox, oy + dm);
+                c.lineTo(ox + d0, oy + dm);       // west to gap
+                c.moveTo(ox + d1, oy + dm);
+                c.lineTo(ox + cellSize, oy + dm); // east to gap
+            } else if (cell.upper.east) { // East-west passage on upper layer
+                c.moveTo(ox, oy + dm);
+                c.lineTo(ox + cellSize, oy + dm); // east west
+                c.moveTo(ox + dm, oy);
+                c.lineTo(ox + dm, oy + d0);       // north to gap
+                c.moveTo(ox + dm, oy + d1);
+                c.lineTo(ox + dm, oy + cellSize); // south to gap
+            } else {
+                // -----------------------------------------------------------
+                // STANDARD PASSAGE WAYS
+                // -----------------------------------------------------------
+                const lower = cell.lower;
+                
+                // Encode passage directions as 4-bit value
+                const value = (lower.north ? 0b1000 : 0) | (lower.east ? 0b0100 : 0) 
+                            | (lower.south ? 0b0010 : 0) | (lower.west ? 0b0001 : 0);
+
+                switch (value) {
+
+                    case 0b1000: // North only (dead end facing south)
+                        c.moveTo(ox + dm, oy);
+                        c.lineTo(ox + dm, oy + dm);                        
+                        break;
+                        
+                    case 0b0100: // East only (dead end facing west)
+                        c.moveTo(ox + cellSize, oy + dm);
+                        c.lineTo(ox + dm, oy + dm);
+                        break;
+                        
+                    case 0b0010: // South only (dead end facing north)
+                        c.moveTo(ox + dm, oy + cellSize);
+                        c.lineTo(ox + dm, oy + dm);
+                        break;
+                        
+                    case 0b0001: // West only (dead end facing east)
+                        c.moveTo(ox, oy + dm);
+                        c.lineTo(ox + dm, oy + dm);
+                        break;
+
+                    case 0b1100: // North + East (turn from north to east)
+                        c.moveTo(ox + dm, oy);
+                        c.arcTo(ox + dm, oy + dm, ox + cellSize, oy + dm, dm);
+                        break;
+                        
+                    case 0b0110: // East + South (turn from east to south)
+                        c.moveTo(ox + cellSize, oy + dm);
+                        c.arcTo(ox + dm, oy + dm, ox + dm, oy + cellSize, dm);
+                        break;
+                        
+                    case 0b0011: // South + West (turn from south to west)
+                        c.moveTo(ox + dm, oy + cellSize);
+                        c.arcTo(ox + dm, oy + dm, ox, oy + dm, dm);
+                        break;
+                        
+                    case 0b1001: // West + North (turn from west to north)
+                        c.moveTo(ox, oy + dm);
+                        c.arcTo(ox + dm, oy + dm, ox + dm, oy, dm);
+                        break;
+
+                    case 0b1101: // North + East + West (T facing south)
+                        c.moveTo(ox, oy + dm);
+                        c.lineTo(ox + cellSize, oy + dm); // east west
+                        c.moveTo(ox + dm, oy);
+                        c.lineTo(ox + dm, oy + dm);       // north to center
+                        break;
+                        
+                    case 0b1110: // North + East + South (T facing west)
+                        c.moveTo(ox + dm, oy);
+                        c.lineTo(ox + dm, oy + cellSize); // north south
+                        c.moveTo(ox + dm, oy + dm);
+                        c.lineTo(ox + cellSize, oy + dm); // center to east
+                        break;
+                        
+                    case 0b0111: // East + South + West (T facing north)
+                        c.moveTo(ox, oy + dm);
+                        c.lineTo(ox + cellSize, oy + dm); // west east
+                        c.moveTo(ox + dm, oy + dm);
+                        c.lineTo(ox + dm, oy + cellSize); // center to south
+                        break;
+                        
+                    case 0b1011: // North + South + West (T facing east)
+                        c.moveTo(ox + dm, oy);
+                        c.lineTo(ox + dm, oy + cellSize); // north south
+                        c.moveTo(ox, oy + dm);
+                        c.lineTo(ox + dm, oy + dm);       // west to center
+                        break;
+
+                    case 0b1111: // Crossroads
+                        c.moveTo(ox + dm, oy);
+                        c.lineTo(ox + dm, oy + cellSize); // north south
+                        c.moveTo(ox, oy + dm);
+                        c.lineTo(ox + cellSize, oy + dm); // east west
+                        break;
+
+                    case 0b1010: // North-South corridor
+                        c.moveTo(ox + dm, oy);
+                        c.lineTo(ox + dm, oy + cellSize);
+                        break;
+                        
+                    case 0b0101: // East-West corridor
+                        c.moveTo(ox, oy + dm);
+                        c.lineTo(ox + cellSize, oy + dm);
+                        break;
+                }
+            }
+        }
+    }
+
+    return c.getPaths();
+}
 async function renderAndSave(solutionPaths: Segment[][] | undefined, wallPaths: Segment[][],
-                             canvasType: 'pdf' | 'svg' | undefined, filename: string,
-                             renderOptions: RenderOptions) {
+                             passagePaths: Segment[][], canvasType: 'pdf' | 'svg' | undefined,
+                             filename: string, renderOptions: RenderOptions) {
 
     let canvas: Canvas;
     let ctx: CanvasRenderingContext2D;
@@ -343,6 +515,14 @@ async function renderAndSave(solutionPaths: Segment[][] | undefined, wallPaths: 
         ctx.fillRect(0, 0, renderOptions.imageWidth, renderOptions.imageHeight);
     }
 
+    if (renderOptions.passageColor.alpha > 0) {
+        const prevWidth = ctx.lineWidth;
+        ctx.lineWidth = renderOptions.passageWidthFrac * renderOptions.cellSize;
+        ctx.strokeStyle = renderOptions.passageColor.toStyle();
+        renderPaths(ctx, passagePaths, renderOptions.roundedCorners);
+        ctx.lineWidth = prevWidth;
+    }
+    
     if (solutionPaths && renderOptions.solutionColor.alpha > 0) {
         ctx.strokeStyle = renderOptions.solutionColor.toStyle();
         renderPaths(ctx, solutionPaths, renderOptions.roundedCorners);
@@ -361,6 +541,7 @@ export async function saveMaze(maze: Maze, renderOptions: RenderOptions) {
     const solutionPaths: Segment[][] | undefined = renderOptions.solution
             ? generateSolutionPaths(maze, renderOptions.cellSize, cellMarginFrac) : undefined;
     const wallPaths = generateWallPaths(maze, renderOptions.cellSize, cellMarginFrac);
+    const passagePaths = generatePassagePaths(maze, renderOptions.cellSize, cellMarginFrac);
     const timestamp = getTimestamp();
 
     for (const extension of toFileExtensions(renderOptions.fileFormat)) {
@@ -374,7 +555,7 @@ export async function saveMaze(maze: Maze, renderOptions: RenderOptions) {
                 filename += '-' + timestamp;
             }
             filename += '.' + extension;
-            await renderAndSave(solution ? solutionPaths : undefined, wallPaths, canvasType, filename, renderOptions);
+            await renderAndSave(solution ? solutionPaths : undefined, wallPaths, passagePaths, canvasType, filename, renderOptions);
         }
     }
 }
