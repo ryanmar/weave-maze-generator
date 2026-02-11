@@ -23,6 +23,7 @@ import {
     DEFAULT_SOLUTION_COLOR,
     DEFAULT_TIMESTAMP,
     DEFAULT_WALL_COLOR,
+    DEFAULT_PASSAGE_COLOR,
     MAX_IMAGE_SIZE,
     MAX_LINE_WIDTH_FRAC,
     MAX_PASSAGE_WIDTH_FRAC,
@@ -100,6 +101,7 @@ Colors (hexadecimal color codes: RRGGBB or RRGGBBAA):
   -a, --wall-color ...        Wall color; default black (000000FF)
   -b, --background-color ...  Background color; default white for png (FFFFFFFF), transparent for svg and pdf (00000000)
   -c, --solution-color ...    Solution path color; default red (FF0000FF)
+  -z, --passage-color ...     Maze passage color; default white (FFFFFFFF)
 
 Other:
   -v, --version               Shows version number
@@ -219,6 +221,11 @@ async function main() {
             {
                 key: 'solution-color',
                 flags: [ '-c', '--solution-color' ],
+                type: ParamType.STRING,
+            },
+            {
+                key: 'passage-color',
+                flags: [ '-z', '--passage-color' ],
                 type: ParamType.STRING,
             },
             {
@@ -457,6 +464,19 @@ async function main() {
     } else {
         wallColor = DEFAULT_WALL_COLOR;
     }
+    
+    const passageColorStr = args.get('passage-color') as string | undefined;
+    let passageColor: Color;
+    if (passageColorStr) {
+        try {
+            passageColor = toColor(passageColorStr);
+        } catch {
+            console.log('\nInvalid passage color.\n');
+            return;
+        }
+    } else {
+        passageColor = DEFAULT_PASSAGE_COLOR;
+    }
 
     const backgroundColorStr = args.get('background-color') as string | undefined;
     let backgroundColor: Color | undefined;
@@ -490,7 +510,7 @@ async function main() {
     void await saveMaze(generateMaze(new MazeOptions(mazeWidth, mazeHeight, loopsFrac, crossFrac, longPassages, mask)),
             new RenderOptions(outputDirectory, fileFormat, filenamePrefix, filenameSolutionSuffix, timestamp, solution,
                     paperSize, cellSize, imageWidth, imageHeight, roundedCorners, lineWidthFrac, passageWidthFrac,
-                    wallColor, solutionColor, backgroundColor));
+                    wallColor, passageColor, solutionColor, backgroundColor));
 }
 
 void await main();
