@@ -1,9 +1,10 @@
 import { Maze } from './Maze';
 import { Cell } from './Cell';
 import { Node } from './Node';
-import { permutations, shuffleArray } from '../utils/arrays';
+import { permutations } from '../utils/arrays';
+import { Entropy } from '../utils/Entropy';
 
-function findBorderNodes(maze: Maze): Set<Node> {
+function findBorderNodes(maze: Maze, entropy: Entropy): Set<Node> {
     const cells = maze.cells;
     const set = new Set<Cell>();
     for (let x = maze.width - 1; x >= 0; --x) {
@@ -35,7 +36,7 @@ function findBorderNodes(maze: Maze): Set<Node> {
         }
     }
     const borderCells = Array.from(set);
-    shuffleArray(borderCells);
+    entropy.shuffleInPlace(borderCells);
     const borderNodes = new Set<Node>();
     borderCells.forEach(cell => borderNodes.add(cell.lower));
     return borderNodes;
@@ -94,10 +95,10 @@ function flood(seed: Node, maze: Maze, borderNodes: Set<Node>, bestSolution: Nod
     }
 }
 
-function wireTerminal(maze: Maze, node: Node) {
+function wireTerminal(maze: Maze, node: Node, entropy: Entropy) {
     const cells = maze.cells;
     const cell = node.cell;
-    const permutation = permutations[Math.floor(permutations.length * Math.random())];
+    const permutation = entropy.randomElement(permutations);
     for (let i = permutation.length - 1; i >= 0; --i) {
         switch (permutation[i]) {
             case 0: {
@@ -136,7 +137,7 @@ function wireTerminal(maze: Maze, node: Node) {
     }
 }
 
-function wireSolution(solution: Node[], maze: Maze) {
+function wireSolution(solution: Node[], maze: Maze, entropy: Entropy) {
     const cells = maze.cells;
     for (let y = maze.height - 1; y >= 0; --y) {
         for (let x = maze.width - 1; x >= 0; --x) {
@@ -146,8 +147,8 @@ function wireSolution(solution: Node[], maze: Maze) {
             upper.north2 = upper.east2 = upper.south2 = upper.west2 = null;
         }
     }
-    wireTerminal(maze, solution[0]);
-    wireTerminal(maze, solution[solution.length - 1]);
+    wireTerminal(maze, solution[0], entropy);
+    wireTerminal(maze, solution[solution.length - 1], entropy);
     for (let i = solution.length - 2; i >= 0; --i) {
         const n0 = solution[i];
         const n1 = solution[i + 1];
@@ -167,10 +168,10 @@ function wireSolution(solution: Node[], maze: Maze) {
     }
 }
 
-export function solveMaze(maze: Maze) {
-    const borderNodes = findBorderNodes(maze);
+export function solveMaze(maze: Maze, entropy: Entropy) {
+    const borderNodes = findBorderNodes(maze, entropy);
     const bestSolution: Node[] = [];
     const stack: Node[] = [];
     borderNodes.forEach(node => flood(node, maze, borderNodes, bestSolution, stack));
-    wireSolution(bestSolution, maze);
+    wireSolution(bestSolution, maze, entropy);
 }

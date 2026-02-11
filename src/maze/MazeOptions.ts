@@ -18,7 +18,8 @@ export class MazeOptions {
                 public readonly loopFrac = DEFAULT_LOOP_FRAC,
                 public readonly crossFrac = DEFAULT_CROSS_FRAC,
                 public readonly longPassages = DEFAULT_LONG_PASSAGES,
-
-                public readonly mask?: boolean[][]) {
+                public readonly mask?: boolean[][],
+                public readonly seed = Math.random()*2**32>>>0
+                ) {
     }
 }
