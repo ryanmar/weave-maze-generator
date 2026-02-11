@@ -4,6 +4,77 @@ import { Node } from './Node';
 import { permutations } from '../utils/arrays';
 import { Entropy } from '../utils/Entropy';
 
+/**
+ * Finds the furthest white cell along a ray from the maze center in a given direction.
+ * 
+ * Uses a DDA (Digital Differential Analyzer) style ray casting algorithm to trace from the
+ * maze center outward along the specified angle until reaching a maze boundary, then returns
+ * the lower node of the last white cell encountered.
+ * 
+ * @param maze - The maze to search within
+ * @param angleDeg - The direction angle in degrees (0° = up, 90° = right, etc.)
+ * @returns The lower node of the furthest white cell found along the ray
+ * @throws {Error} If no white border cell is found in the specified direction
+ * 
+ * Note: Compass degrees (or clockwise from north) are used for angle input, where 0° is north, 
+ * 90° is east, 180° is south, and 270° is west. This aligns with the domain (w3c) view. 
+ */
+export function findBorderCellByDegrees(maze: Maze, angleDeg: number): Node {
+    const cells = maze.cells;
+    // Convert from +/- compass to positive math degree
+    const normalizedAngle = ((450 - angleDeg) % 360 + 360) % 360; 
+    const angleRad = (normalizedAngle * Math.PI) / 180;
+    const dx = Math.cos(angleRad);
+    const dy = Math.sin(angleRad);
+    let centerX = Math.floor(maze.width / 2);
+    let centerY = Math.floor(maze.height / 2);
+    let x = centerX;
+    let y = centerY;
+
+    const stepX = dx > 0 ? 1 : -1;
+    const stepY = dy > 0 ? 1 : -1;
+
+    const tDeltaX = dx === 0 ? Infinity : Math.abs(1 / dx);
+    const tDeltaY = dy === 0 ? Infinity : Math.abs(1 / dy);
+
+    let tMaxX =
+        dx === 0
+            ? Infinity
+            : dx > 0
+            ? (x + 1 - (centerX + 0.5)) / dx
+            : (centerX + 0.5 - x) / -dx;
+
+    let tMaxY =
+        dy === 0
+            ? Infinity
+            : dy > 0
+            ? (y + 1 - (centerY + 0.5)) / dy
+            : (centerY + 0.5 - y) / -dy;
+
+    let furthest: Node | null = null;
+
+    while (x >= 0 && y >= 0 && x < maze.width && y < maze.height) {
+        if (cells[y][x].white) {
+            furthest = cells[y][x].lower;
+        }
+
+        if (tMaxX <= tMaxY) {
+            tMaxX += tDeltaX;
+            x += stepX;
+        } else {
+            tMaxY += tDeltaY;
+            y += stepY;
+        }
+    }
+
+    if (furthest === null) {
+        throw new Error('No border cell found in the ' + angleDeg + ' degree direction');
+    }
+    
+    return furthest;  
+}
+
+
 function findBorderNodes(maze: Maze, entropy: Entropy): Set<Node> {
     const cells = maze.cells;
     const set = new Set<Cell>();
@@ -42,7 +113,20 @@ function findBorderNodes(maze: Maze, entropy: Entropy): Set<Node> {
     return borderNodes;
 }
 
-function flood(seed: Node, maze: Maze, borderNodes: Set<Node>, bestSolution: Node[], stack: Node[]) {
+/**
+ * Performs a breadth-first search (BFS) flood-fill to evaluate paths through the maze from a given starting node. 
+ * If a target node is provided, the optimal solution is the shortest path to that target.
+ * If no target is specified, the optimal solution is the longest reachable path from the start node, favoring 
+ * routes that are more engaging and visually interesting.
+ * 
+ * @param seed - The starting node for the flood fill algorithm
+ * @param maze - The maze structure containing cells to traverse
+ * @param borderNodes - A set of nodes that represent the border/exit points of the maze
+ * @param bestSolution - An array that will be populated with the 'best' path found (modified in place)
+ * @param targetNode - Optional target node to reach; if found, the search terminates immediately
+ * 
+ */
+function flood(seed: Node, maze: Maze, borderNodes: Set<Node>, bestSolution: Node[], stack: Node[], targetNode?: Node | undefined) {
     const cells = maze.cells;
     for (let y = maze.height - 1; y >= 0; --y) {
         for (let x = maze.width - 1; x >= 0; --x) {
@@ -60,7 +144,8 @@ function flood(seed: Node, maze: Maze, borderNodes: Set<Node>, bestSolution: Nod
         if (!node) {
             break;
         }
-        if (borderNodes.has(node) && node.region > bestSolution.length) {
+        const complete = targetNode ? node === targetNode : false;
+        if (borderNodes.has(node) && (complete || node.region > bestSolution.length)) {
             bestSolution.length = 0;
             let n = node;
             while (true) {
@@ -69,6 +154,9 @@ function flood(seed: Node, maze: Maze, borderNodes: Set<Node>, bestSolution: Nod
                     break;
                 }
                 n = n.visitedBy;
+            }
+            if (complete) { 
+                break;
             }
         }
         const nextLength = node.region + 1;
@@ -85,13 +173,13 @@ function flood(seed: Node, maze: Maze, borderNodes: Set<Node>, bestSolution: Nod
         if (node.south && !node.south.visitedBy) {
             node.south.visitedBy = node;
             node.south.region = nextLength;
-            stack.push(node.south);
+                stack.push(node.south);
         }
         if (node.west && !node.west.visitedBy) {
             node.west.visitedBy = node;
             node.west.region = nextLength;
             stack.push(node.west);
-        }
+            }
     }
 }
 
@@ -168,10 +256,22 @@ function wireSolution(solution: Node[], maze: Maze, entropy: Entropy) {
     }
 }
 
-export function solveMaze(maze: Maze, entropy: Entropy) {
+export function solveMaze(maze: Maze, entropy: Entropy, entryAngle: number | undefined, exitAngle: number | undefined) {   
     const borderNodes = findBorderNodes(maze, entropy);
     const bestSolution: Node[] = [];
     const stack: Node[] = [];
-    borderNodes.forEach(node => flood(node, maze, borderNodes, bestSolution, stack));
+    if (entryAngle || entryAngle === 0) {
+        // Handle both entry-only and entry and exit specified cases.
+        flood(findBorderCellByDegrees(maze, entryAngle), maze, borderNodes, bestSolution, stack, 
+              exitAngle || exitAngle === 0 ? findBorderCellByDegrees(maze, exitAngle) : undefined);
+    } else if (exitAngle || exitAngle === 0) {
+        // Handle exit-only specified case.
+        flood(findBorderCellByDegrees(maze, exitAngle), maze, borderNodes, bestSolution, stack);
+        bestSolution.reverse();
+    } else {
+        // Best (longest) solution to select entry and exit nodes.
+        borderNodes.forEach(node => flood(node, maze, borderNodes, bestSolution, stack));
+    }
+
     wireSolution(bestSolution, maze, entropy);
 }
