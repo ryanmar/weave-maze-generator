@@ -660,6 +660,6 @@ export function generateMaze(options: MazeOptions): Maze {
     addLoopsAndCrosses(maze, options.loopFrac, options.crossFrac, stack, entropy);
     const regions = assignRegions(maze, stack);
     createSpanningTree(maze, stack, regions, options.longPassages, entropy);
-    solveMaze(maze, entropy, options.entryAngle, options.exitAngle);
+    solveMaze(maze, entropy);
     return maze;
 }

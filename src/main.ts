@@ -92,10 +92,6 @@ Dimensions (specify one only):
   -H, --image-height ...      Output image height in pixels
                               Default: (maze height x cell size) or (image width x maze height / maze width)
 
-Endpoints:                    In degrees clockwise from north (0, 360) or longest path if not specified. 
-  --entry-angle ...           Starting angle of maze entry point (default: longest path from exit)
-  --exit-angle ...            Angle of maze exit point (default: longest path from starting or overall)  
-
 Corners:
   -s, --square                Enables square corners instead of the default rounded corners.
 
@@ -168,16 +164,6 @@ async function main() {
                 key: 'maze-height',
                 flags: [ '-h', '--maze-height' ],
                 type: ParamType.INTEGER,
-            },
-            {
-                key: 'entry-angle',
-                flags: [ '--entry-angle' ],
-                type: ParamType.FLOAT,
-            },
-            {
-                key: 'exit-angle',
-                flags: [ '--exit-angle' ],
-                type: ParamType.FLOAT,
             },
             {
                 key: 'mask',
@@ -344,10 +330,6 @@ async function main() {
 
     let mazeWidth = args.get('maze-width') as number | undefined;
     let mazeHeight = args.get('maze-height') as number | undefined;
-
-    let entryAngle = args.get('entry-angle') as number | undefined;
-    let exitAngle = args.get('exit-angle') as number | undefined;   
-
     const maskFilename = args.get('mask') as string | undefined;
     let mask: boolean[][] | undefined;
     if (maskFilename) {
@@ -540,14 +522,10 @@ async function main() {
         return;
     }
 
-    void await saveMaze(
-        generateMaze(
-            new MazeOptions(mazeWidth, mazeHeight, loopsFrac, crossFrac, longPassages, seed, mask, entryAngle, exitAngle)),
-        new RenderOptions(
-            outputDirectory, fileFormat, filenamePrefix, filenameSolutionSuffix, timestamp, solution,
-            paperSize, cellSize, imageWidth, imageHeight, roundedCorners, lineWidthFrac, passageWidthFrac,
-            wallColor, solutionColor, backgroundColor)
-        );
+    void await saveMaze(generateMaze(new MazeOptions(mazeWidth, mazeHeight, loopsFrac, crossFrac, longPassages, mask, seed)),
+            new RenderOptions(outputDirectory, fileFormat, filenamePrefix, filenameSolutionSuffix, timestamp, solution,
+                    paperSize, cellSize, imageWidth, imageHeight, roundedCorners, lineWidthFrac, passageWidthFrac,
+                    wallColor, passageColor, solutionColor, backgroundColor));
 }
 
 void await main();
